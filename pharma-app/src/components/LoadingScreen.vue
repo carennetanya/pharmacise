@@ -4,12 +4,7 @@
 
     <div class="content">
       <div class="logo-row">
-        <div class="logo-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="9" y="3" width="6" height="18" rx="1.5" fill="white" />
-            <rect x="3" y="9" width="18" height="6" rx="1.5" fill="white" />
-          </svg>
-        </div>
+        <img src="/logo.png" alt="Pharmacise logo" class="logo-icon" />
         <div class="brand-text">
           <h1>PHARMACISE</h1>
           <p class="cn">问医</p>
@@ -117,17 +112,7 @@ onBeforeUnmount(() => {
 .logo-icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #14b88a, #0d8f6b);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 14px rgba(13, 143, 107, 0.35);
-}
-
-.logo-icon svg {
-  width: 20px;
-  height: 20px;
+  object-fit: contain;
 }
 
 .brand-text h1 {
