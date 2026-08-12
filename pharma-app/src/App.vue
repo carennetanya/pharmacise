@@ -9,6 +9,8 @@
     <AdminDashboard v-if="currentPage === 'dashboard'" @navigate="currentPage = $event" />
     <Inventory v-else-if="currentPage === 'inventory'" @navigate="currentPage = $event" />
     <Orders v-else-if="currentPage === 'orders'" @navigate="currentPage = $event" />
+    <Suppliers v-else-if="currentPage === 'suppliers'" @navigate="currentPage = $event" />
+    <Analytics v-else-if="currentPage === 'analytics'" @navigate="currentPage = $event" />
   </template>
 
   <div v-else class="app">
@@ -24,6 +26,8 @@ import LoginPage from './components/LoginPage.vue'
 import AdminDashboard from './components/AdminDashboard.vue'
 import Inventory from './components/Inventory.vue'
 import Orders from './components/Orders.vue'
+import Suppliers from './components/Suppliers.vue'
+import Analytics from './components/Analytics.vue'
 
 const isLoading = ref(true)
 const selectedRole = ref(null)
