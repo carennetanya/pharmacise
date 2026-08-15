@@ -11,6 +11,13 @@
     <Orders v-else-if="currentPage === 'orders'" @navigate="currentPage = $event" />
     <Suppliers v-else-if="currentPage === 'suppliers'" @navigate="currentPage = $event" />
     <Analytics v-else-if="currentPage === 'analytics'" @navigate="currentPage = $event" />
+    <Settings v-else-if="currentPage === 'settings'" @navigate="currentPage = $event" />
+  </template>
+
+  <template v-else-if="selectedRole === 'cashier'">
+    <CashierDashboard v-if="currentPage === 'dashboard'" @navigate="currentPage = $event" />
+    <CashierTransaction v-else-if="currentPage === 'transaksi'" @navigate="currentPage = $event" />
+    <CashierInventory v-else-if="currentPage === 'inventory'" @navigate="currentPage = $event" />
   </template>
 
   <div v-else class="app">
@@ -28,6 +35,10 @@ import Inventory from './components/Inventory.vue'
 import Orders from './components/Orders.vue'
 import Suppliers from './components/Suppliers.vue'
 import Analytics from './components/Analytics.vue'
+import Settings from './components/Settings.vue'
+import CashierDashboard from './components/CashierDashboard.vue'
+import CashierTransaction from './components/CashierTransaction.vue'
+import CashierInventory from './components/CashierInventory.vue'
 
 const isLoading = ref(true)
 const selectedRole = ref(null)
