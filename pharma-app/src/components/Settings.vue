@@ -167,81 +167,101 @@
           </div>
 
           <div v-else class="settings-content">
+            <div v-if="pharmacyError" class="banner error-banner">{{ pharmacyError }}</div>
+            <div v-if="pharmacySuccess" class="banner success-banner">{{ pharmacySuccess }}</div>
+
             <div class="card">
               <h2>Informasi Apotek</h2>
 
-              <div class="avatar-row">
-                <div class="settings-avatar logo">🏥</div>
-                <div>
-                  <button class="link-btn">Ganti Logo</button>
-                  <p class="hint">SVG atau PNG dengan latar transparan</p>
-                </div>
-              </div>
+              <div v-if="loadingPharmacy" class="hint">Memuat data apotek...</div>
 
-              <div class="divider"></div>
+              <template v-else>
+                <div class="logo-row">
+                  <button
+                    class="logo-upload-btn"
+                    type="button"
+                    aria-label="Ganti Logo"
+                    :disabled="uploadingLogo"
+                    @click="triggerLogoPicker"
+                  >
+                    <img v-if="pharmacy.logo_url" :src="pharmacy.logo_url" alt="Logo apotek" class="logo-preview" />
+                    <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 5V19M5 12H19" stroke="white" stroke-width="2.2" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                  <input
+                    ref="logoInput"
+                    type="file"
+                    accept="image/png, image/jpeg, image/svg+xml"
+                    class="hidden-file-input"
+                    @change="handleLogoChange"
+                  />
+                  <div>
+                    <button class="link-btn" type="button" :disabled="uploadingLogo" @click="triggerLogoPicker">
+                      {{ uploadingLogo ? 'Mengunggah...' : 'Ganti Logo' }}
+                    </button>
+                    <p class="hint">Digunakan pada struk &amp; laporan</p>
+                  </div>
+                </div>
 
-              <div class="field-grid">
-                <div class="field">
-                  <label>Nama Apotek</label>
-                  <input v-model="pharmacy.name" type="text" />
+                <div class="divider"></div>
+
+                <div class="field-grid">
+                  <div class="field">
+                    <label>Nama Apotek</label>
+                    <input v-model="pharmacy.name" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>Nomor Izin (SIA)</label>
+                    <input v-model="pharmacy.license" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>Nomor Telepon</label>
+                    <input v-model="pharmacy.phone" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>Email</label>
+                    <input v-model="pharmacy.email" type="text" />
+                  </div>
+                  <div class="field wide">
+                    <label>Alamat</label>
+                    <input v-model="pharmacy.address" type="text" />
+                  </div>
                 </div>
-                <div class="field">
-                  <label>Nomor Telepon</label>
-                  <input v-model="pharmacy.phone" type="text" />
-                </div>
-                <div class="field">
-                  <label>Nomor Izin Apotek</label>
-                  <input v-model="pharmacy.license" type="text" />
-                </div>
-                <div class="field">
-                  <label>Email Apotek</label>
-                  <input v-model="pharmacy.email" type="text" />
-                </div>
-                <div class="field wide">
-                  <label>Alamat</label>
-                  <input v-model="pharmacy.address" type="text" />
-                </div>
-              </div>
+              </template>
             </div>
 
             <div class="card">
               <div class="staff-header">
-                <h3>Staf &amp; Akses</h3>
-                <button class="add-staff-btn" @click="addStaffOpen = !addStaffOpen">+ Tambah Staf</button>
+                <h3>Akun Staf &amp; Kasir</h3>
+                <button class="add-staff-btn" :disabled="!pharmacyId" @click="openAddModal">+ Tambah Staf / Kasir</button>
               </div>
 
-              <div v-if="addStaffOpen" class="add-staff-form">
-                <input v-model="newStaff.name" type="text" placeholder="Nama staf" />
-                <input v-model="newStaff.email" type="text" placeholder="Email" />
-                <select v-model="newStaff.role">
-                  <option value="Cashier">Cashier</option>
-                  <option value="Staff">Staff</option>
-                  <option value="Owner">Owner</option>
-                </select>
-                <button class="add-staff-confirm" @click="addStaff">Tambahkan</button>
-              </div>
+              <p v-if="!pharmacyId && !loadingPharmacy" class="hint">
+                Simpan informasi apotek terlebih dahulu sebelum menambahkan staf.
+              </p>
+              <p v-else-if="loadingStaff" class="hint">Memuat daftar staf...</p>
+              <p v-else-if="staff.length === 0" class="hint">Belum ada staf atau kasir yang ditambahkan.</p>
 
-              <table class="staff-table">
+              <table v-else class="staff-table">
                 <thead>
                   <tr>
                     <th>Nama</th>
                     <th>Peran</th>
                     <th>Email</th>
                     <th>Status</th>
-                    <th></th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="member in staff" :key="member.email">
+                  <tr v-for="member in staff" :key="member.id">
                     <td class="name">{{ member.name }}</td>
                     <td><span class="role-pill" :class="member.role.toLowerCase()">{{ member.role }}</span></td>
                     <td class="muted">{{ member.email }}</td>
                     <td><span class="status-pill" :class="member.status">{{ member.status === 'active' ? 'Aktif' : 'Nonaktif' }}</span></td>
                     <td class="actions">
-                      <button class="text-btn" @click="toggleStaffStatus(member)">
-                        {{ member.status === 'active' ? 'Nonaktifkan' : 'Aktifkan' }}
-                      </button>
-                      <button class="text-btn danger" @click="removeStaff(member)">Hapus</button>
+                      <button class="text-btn" @click="openEditModal(member)">Edit</button>
+                      <button class="text-btn danger" @click="askRemoveStaff(member)">Hapus</button>
                     </td>
                   </tr>
                 </tbody>
@@ -249,18 +269,223 @@
             </div>
 
             <div class="actions-row">
-              <button class="cancel-btn">Batal</button>
-              <button class="save-btn" @click="savePharmacy">Simpan Perubahan</button>
+              <button class="cancel-btn" type="button" :disabled="savingPharmacy" @click="loadPharmacyData">Batal</button>
+              <button class="save-btn" :disabled="savingPharmacy || loadingPharmacy" @click="savePharmacy">
+                {{ savingPharmacy ? 'Menyimpan...' : 'Simpan Perubahan' }}
+              </button>
             </div>
           </div>
         </div>
       </main>
     </div>
+
+    <!-- Add Staff / Cashier Modal -->
+    <div v-if="addModalOpen" class="modal-overlay" @click.self="closeAddModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <h3>Tambah Staf / Kasir Baru</h3>
+            <p class="modal-sub">Buat akun login agar mereka dapat mengakses POS atau sistem inventaris.</p>
+          </div>
+          <button class="modal-close" @click="closeAddModal" aria-label="Tutup">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 6L18 18M6 18L18 6" stroke="#6c7d76" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="field">
+            <label>Nama Lengkap</label>
+            <input v-model="newStaff.name" type="text" placeholder="cth. Dewi Anggraini" />
+          </div>
+
+          <div class="field">
+            <label>Peran</label>
+            <div class="role-select">
+              <button
+                type="button"
+                class="role-card"
+                :class="{ active: newStaff.role === 'Staff' }"
+                @click="newStaff.role = 'Staff'"
+              >
+                <span class="role-card-title">Staff</span>
+                <span class="role-card-desc">Teknisi Apotek</span>
+              </button>
+              <button
+                type="button"
+                class="role-card"
+                :class="{ active: newStaff.role === 'Cashier' }"
+                @click="newStaff.role = 'Cashier'"
+              >
+                <span class="role-card-title">Cashier</span>
+                <span class="role-card-desc">Akses POS Saja</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="field-grid two">
+            <div class="field">
+              <label>Email</label>
+              <input v-model="newStaff.email" type="text" placeholder="nama@pharmacise.id" />
+            </div>
+            <div class="field">
+              <label>Nomor Telepon</label>
+              <input v-model="newStaff.phone" type="text" placeholder="+62 8xx-xxxx-xxxx" />
+            </div>
+          </div>
+
+          <div class="field-grid two">
+            <div class="field">
+              <label>Kode PIN (untuk Login POS)</label>
+              <input v-model="newStaff.pin" type="password" maxlength="4" placeholder="••••" />
+            </div>
+            <div class="field">
+              <label>Konfirmasi PIN</label>
+              <input v-model="newStaff.confirmPin" type="password" maxlength="4" placeholder="••••" />
+            </div>
+          </div>
+
+          <div class="info-banner">
+            Staff dapat mengelola inventaris &amp; pesanan. Cashier hanya dapat mengakses layar checkout POS.
+          </div>
+
+          <div v-if="addStaffError" class="banner error-banner">{{ addStaffError }}</div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="cancel-btn" type="button" :disabled="addingStaff" @click="closeAddModal">Batal</button>
+          <button class="save-btn" :disabled="addingStaff" @click="confirmAddStaff">
+            {{ addingStaff ? 'Menambahkan...' : 'Tambah Akun' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Staff / Cashier Modal -->
+    <div v-if="editModalOpen" class="modal-overlay" @click.self="closeEditModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <h3>Edit Staf / Kasir</h3>
+            <p class="modal-sub">Perbarui detail akun atau kelola akses untuk anggota tim ini.</p>
+          </div>
+          <button class="modal-close" @click="closeEditModal" aria-label="Tutup">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 6L18 18M6 18L18 6" stroke="#6c7d76" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="field">
+            <label>Nama Lengkap</label>
+            <input v-model="editForm.name" type="text" />
+          </div>
+
+          <div class="field">
+            <label>Peran</label>
+            <div class="role-select">
+              <button
+                type="button"
+                class="role-card"
+                :class="{ active: editForm.role === 'Staff' }"
+                @click="editForm.role = 'Staff'"
+              >
+                <span class="role-card-title">Staff</span>
+                <span class="role-card-desc">Teknisi Apotek</span>
+              </button>
+              <button
+                type="button"
+                class="role-card"
+                :class="{ active: editForm.role === 'Cashier' }"
+                @click="editForm.role = 'Cashier'"
+              >
+                <span class="role-card-title">Cashier</span>
+                <span class="role-card-desc">Akses POS Saja</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="field-grid two">
+            <div class="field">
+              <label>Email</label>
+              <input v-model="editForm.email" type="text" />
+            </div>
+            <div class="field">
+              <label>Nomor Telepon</label>
+              <input v-model="editForm.phone" type="text" />
+            </div>
+          </div>
+
+          <div class="field-grid two">
+            <div class="field">
+              <label>Kode PIN (untuk Login POS)</label>
+              <input v-model="editForm.pin" type="password" maxlength="4" placeholder="••••" />
+            </div>
+            <div class="field">
+              <label>Konfirmasi PIN</label>
+              <input v-model="editForm.confirmPin" type="password" maxlength="4" placeholder="••••" />
+            </div>
+          </div>
+          <p class="pin-hint">Kosongkan untuk mempertahankan PIN saat ini</p>
+
+          <div class="info-banner">
+            Staff dapat mengelola inventaris &amp; pesanan. Cashier hanya dapat mengakses layar checkout POS.
+          </div>
+
+          <div v-if="editStaffError" class="banner error-banner">{{ editStaffError }}</div>
+        </div>
+
+        <div class="modal-footer spread">
+          <button class="remove-access-btn" type="button" :disabled="savingEdit" @click="askRemoveStaff(editingMember)">Hapus Akses</button>
+          <div class="modal-footer-right">
+            <button class="cancel-btn" type="button" :disabled="savingEdit" @click="closeEditModal">Batal</button>
+            <button class="save-btn" :disabled="savingEdit" @click="saveEditStaff">
+              {{ savingEdit ? 'Menyimpan...' : 'Simpan Perubahan' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Remove Access Confirmation Modal -->
+    <div v-if="removeConfirmOpen" class="modal-overlay" @click.self="cancelRemoveStaff">
+      <div class="modal-card small">
+        <div class="warning-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 9V13M12 17H12.01" stroke="#d9534f" stroke-width="2" stroke-linecap="round" />
+            <circle cx="12" cy="12" r="9" stroke="#d9534f" stroke-width="1.8" />
+          </svg>
+        </div>
+        <h3 class="confirm-title">Hapus Akses?</h3>
+        <p class="confirm-text">
+          Apakah Anda yakin ingin mencabut akses {{ memberToRemove ? memberToRemove.name : '' }}? Mereka tidak akan bisa lagi masuk ke PharmaCise.
+        </p>
+        <div v-if="removeStaffError" class="banner error-banner">{{ removeStaffError }}</div>
+        <div class="modal-footer center">
+          <button class="cancel-btn" type="button" :disabled="removingStaff" @click="cancelRemoveStaff">Batal</button>
+          <button class="remove-confirm-btn" :disabled="removingStaff" @click="confirmRemoveStaff">
+            {{ removingStaff ? 'Menghapus...' : 'Ya, Hapus' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, h } from 'vue'
+import { ref, h, onMounted } from 'vue'
+import {
+  fetchMyPharmacy,
+  savePharmacyInfo,
+  uploadPharmacyLogo,
+  fetchStaff,
+  addStaffMember,
+  updateStaffMember,
+  setStaffPin,
+  removeStaffAccess
+} from '../services/pharmacySettings'
 
 const emit = defineEmits(['navigate'])
 
@@ -335,46 +560,288 @@ const notifications = ref({
   weeklyEmail: false
 })
 
+// ---------------------------------------------------------------------------
+// Info Apotek — pharmacy profile + staff/cashier accounts (Supabase-backed)
+// ---------------------------------------------------------------------------
+
+const pharmacyId = ref(null)
 const pharmacy = ref({
-  name: 'Apotek Sehat Selalu',
-  phone: '021-5550-1234',
-  license: 'SIA-0421-JKT',
-  email: 'admin@apoteksehatselalu.id',
-  address: 'Jl. Melati Raya No. 12, Jakarta Selatan'
+  name: '',
+  phone: '',
+  license: '',
+  email: '',
+  address: '',
+  logo_url: null
 })
 
-const staff = ref([
-  { name: 'Dr. Aris', email: 'aris@pharmacise.id', role: 'Owner', status: 'active' },
-  { name: 'Andi Wijaya', email: 'andi@pharmacise.id', role: 'Cashier', status: 'active' },
-  { name: 'Siti Rahma', email: 'siti@pharmacise.id', role: 'Staff', status: 'active' },
-  { name: 'Budi Hartono', email: 'budi@pharmacise.id', role: 'Cashier', status: 'inactive' }
-])
+const loadingPharmacy = ref(false)
+const savingPharmacy = ref(false)
+const pharmacyError = ref('')
+const pharmacySuccess = ref('')
 
-const addStaffOpen = ref(false)
-const newStaff = ref({ name: '', email: '', role: 'Cashier' })
+const staff = ref([])
+const loadingStaff = ref(false)
 
-function addStaff() {
-  if (!newStaff.value.name.trim() || !newStaff.value.email.trim()) return
-  staff.value.push({ ...newStaff.value, status: 'active' })
-  newStaff.value = { name: '', email: '', role: 'Cashier' }
-  addStaffOpen.value = false
+const logoInput = ref(null)
+const uploadingLogo = ref(false)
+
+function pharmacyRowToForm(row) {
+  return {
+    name: row.name || '',
+    phone: row.phone || '',
+    license: row.license_number || '',
+    email: row.email || '',
+    address: row.address || '',
+    logo_url: row.logo_url || null
+  }
 }
 
-function toggleStaffStatus(member) {
-  member.status = member.status === 'active' ? 'inactive' : 'active'
+async function loadPharmacyData() {
+  loadingPharmacy.value = true
+  pharmacyError.value = ''
+  pharmacySuccess.value = ''
+  try {
+    const row = await fetchMyPharmacy()
+    if (row) {
+      pharmacyId.value = row.id
+      pharmacy.value = pharmacyRowToForm(row)
+      await loadStaffData()
+    } else {
+      pharmacyId.value = null
+      pharmacy.value = { name: '', phone: '', license: '', email: '', address: '', logo_url: null }
+      staff.value = []
+    }
+  } catch (err) {
+    pharmacyError.value = err.message || 'Gagal memuat data apotek.'
+  } finally {
+    loadingPharmacy.value = false
+  }
 }
 
-function removeStaff(member) {
-  staff.value = staff.value.filter((m) => m.email !== member.email)
+async function savePharmacy() {
+  savingPharmacy.value = true
+  pharmacyError.value = ''
+  pharmacySuccess.value = ''
+  try {
+    const row = await savePharmacyInfo({ ...pharmacy.value, id: pharmacyId.value })
+    pharmacyId.value = row.id
+    pharmacy.value = pharmacyRowToForm(row)
+    pharmacySuccess.value = 'Informasi apotek berhasil disimpan.'
+    if (staff.value.length === 0) await loadStaffData()
+  } catch (err) {
+    pharmacyError.value = err.message || 'Gagal menyimpan informasi apotek.'
+  } finally {
+    savingPharmacy.value = false
+  }
+}
+
+function triggerLogoPicker() {
+  if (uploadingLogo.value) return
+  logoInput.value?.click()
+}
+
+async function handleLogoChange(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+
+  uploadingLogo.value = true
+  pharmacyError.value = ''
+  try {
+    const publicUrl = await uploadPharmacyLogo(file)
+    pharmacy.value.logo_url = publicUrl
+    // Persist immediately so a refresh doesn't lose the new logo.
+    if (pharmacyId.value) {
+      await savePharmacy()
+    }
+  } catch (err) {
+    pharmacyError.value = err.message || 'Gagal mengunggah logo.'
+  } finally {
+    uploadingLogo.value = false
+  }
+}
+
+async function loadStaffData() {
+  if (!pharmacyId.value) return
+  loadingStaff.value = true
+  try {
+    staff.value = await fetchStaff(pharmacyId.value)
+  } catch (err) {
+    pharmacyError.value = err.message || 'Gagal memuat daftar staf.'
+  } finally {
+    loadingStaff.value = false
+  }
+}
+
+function emptyStaffForm() {
+  return { name: '', role: 'Staff', email: '', phone: '', pin: '', confirmPin: '' }
+}
+
+function validatePinPair(pin, confirmPin, { required }) {
+  if (!pin && !confirmPin && !required) return null
+  if (!/^[0-9]{4}$/.test(pin || '')) return 'PIN harus terdiri dari 4 digit angka.'
+  if (pin !== confirmPin) return 'Konfirmasi PIN tidak cocok.'
+  return null
+}
+
+// Add Staff / Cashier modal
+const addModalOpen = ref(false)
+const newStaff = ref(emptyStaffForm())
+const addingStaff = ref(false)
+const addStaffError = ref('')
+
+function openAddModal() {
+  newStaff.value = emptyStaffForm()
+  addStaffError.value = ''
+  addModalOpen.value = true
+}
+
+function closeAddModal() {
+  if (addingStaff.value) return
+  addModalOpen.value = false
+}
+
+async function confirmAddStaff() {
+  addStaffError.value = ''
+
+  if (!newStaff.value.name.trim() || !newStaff.value.email.trim()) {
+    addStaffError.value = 'Nama dan email wajib diisi.'
+    return
+  }
+  const pinError = validatePinPair(newStaff.value.pin, newStaff.value.confirmPin, { required: true })
+  if (pinError) {
+    addStaffError.value = pinError
+    return
+  }
+  if (!pharmacyId.value) {
+    addStaffError.value = 'Simpan informasi apotek terlebih dahulu.'
+    return
+  }
+
+  addingStaff.value = true
+  try {
+    const row = await addStaffMember({
+      pharmacyId: pharmacyId.value,
+      name: newStaff.value.name,
+      email: newStaff.value.email,
+      phone: newStaff.value.phone,
+      role: newStaff.value.role,
+      pin: newStaff.value.pin
+    })
+    staff.value.push(row)
+    addModalOpen.value = false
+  } catch (err) {
+    addStaffError.value = err.message || 'Gagal menambahkan staf.'
+  } finally {
+    addingStaff.value = false
+  }
+}
+
+// Edit Staff / Cashier modal
+const editModalOpen = ref(false)
+const editForm = ref(emptyStaffForm())
+const editingMember = ref(null)
+const savingEdit = ref(false)
+const editStaffError = ref('')
+
+function openEditModal(member) {
+  editingMember.value = member
+  editForm.value = {
+    name: member.name,
+    role: member.role,
+    email: member.email,
+    phone: member.phone || '',
+    pin: '',
+    confirmPin: ''
+  }
+  editStaffError.value = ''
+  editModalOpen.value = true
+}
+
+function closeEditModal() {
+  if (savingEdit.value) return
+  editModalOpen.value = false
+  editingMember.value = null
+}
+
+async function saveEditStaff() {
+  if (!editingMember.value) return
+  editStaffError.value = ''
+
+  if (!editForm.value.name.trim() || !editForm.value.email.trim()) {
+    editStaffError.value = 'Nama dan email wajib diisi.'
+    return
+  }
+  const pinError = validatePinPair(editForm.value.pin, editForm.value.confirmPin, { required: false })
+  if (pinError) {
+    editStaffError.value = pinError
+    return
+  }
+
+  savingEdit.value = true
+  try {
+    const updated = await updateStaffMember(editingMember.value.id, {
+      name: editForm.value.name,
+      email: editForm.value.email,
+      phone: editForm.value.phone,
+      role: editForm.value.role
+    })
+    if (editForm.value.pin) {
+      await setStaffPin(editingMember.value.id, editForm.value.pin)
+    }
+    Object.assign(editingMember.value, updated)
+    editModalOpen.value = false
+    editingMember.value = null
+  } catch (err) {
+    editStaffError.value = err.message || 'Gagal menyimpan perubahan.'
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+// Remove access confirmation
+const removeConfirmOpen = ref(false)
+const memberToRemove = ref(null)
+const removingStaff = ref(false)
+const removeStaffError = ref('')
+
+function askRemoveStaff(member) {
+  if (!member) return
+  memberToRemove.value = member
+  removeStaffError.value = ''
+  removeConfirmOpen.value = true
+  editModalOpen.value = false
+}
+
+function cancelRemoveStaff() {
+  if (removingStaff.value) return
+  removeConfirmOpen.value = false
+  memberToRemove.value = null
+}
+
+async function confirmRemoveStaff() {
+  if (!memberToRemove.value) return
+  removingStaff.value = true
+  removeStaffError.value = ''
+  try {
+    await removeStaffAccess(memberToRemove.value.id)
+    staff.value = staff.value.filter((m) => m.id !== memberToRemove.value.id)
+    removeConfirmOpen.value = false
+    memberToRemove.value = null
+  } catch (err) {
+    removeStaffError.value = err.message || 'Gagal menghapus akses staf.'
+  } finally {
+    removingStaff.value = false
+  }
 }
 
 function saveProfile() {
   window.alert('Profil berhasil disimpan.')
 }
 
-function savePharmacy() {
-  window.alert('Informasi apotek berhasil disimpan.')
-}
+onMounted(() => {
+  loadPharmacyData()
+})
 </script>
 
 <style scoped>
@@ -678,10 +1145,67 @@ function savePharmacy() {
   justify-content: center;
 }
 
-.settings-avatar.logo {
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.logo-upload-btn {
+  width: 64px;
+  height: 64px;
   border-radius: 16px;
-  background: #eef4f2;
-  font-size: 26px;
+  background: #2f8f70;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.logo-upload-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.logo-upload-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.logo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.link-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.banner {
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.error-banner {
+  background: rgba(217, 83, 79, 0.1);
+  color: #d9534f;
+}
+
+.success-banner {
+  background: rgba(47, 143, 112, 0.12);
+  color: #0f6b52;
 }
 
 .link-btn {
@@ -710,6 +1234,10 @@ function savePharmacy() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+.field-grid.two {
+  margin-bottom: 0;
 }
 
 .field.wide {
@@ -845,37 +1373,6 @@ function savePharmacy() {
   cursor: pointer;
 }
 
-.add-staff-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr 140px auto;
-  gap: 10px;
-  margin-bottom: 18px;
-  background: #f3f6f5;
-  padding: 14px;
-  border-radius: 10px;
-}
-
-.add-staff-form input {
-  border: 1px solid rgba(15, 107, 82, 0.15);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 13px;
-  outline: none;
-  font-family: inherit;
-}
-
-.add-staff-confirm {
-  background: #0f6b52;
-  border: none;
-  color: white;
-  font-weight: 700;
-  font-size: 12px;
-  padding: 0 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 .staff-table {
   width: 100%;
   border-collapse: collapse;
@@ -921,8 +1418,8 @@ function savePharmacy() {
 }
 
 .role-pill.cashier {
-  background: rgba(38, 102, 204, 0.12);
-  color: #2666cc;
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
 }
 
 .status-pill {
@@ -961,5 +1458,200 @@ function savePharmacy() {
 
 .text-btn.danger {
   color: #d9534f;
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 30, 25, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+
+.modal-card {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 26px;
+}
+
+.modal-card.small {
+  max-width: 400px;
+  text-align: center;
+  padding: 30px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.modal-header h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #17332a;
+}
+
+.modal-sub {
+  margin: 0;
+  font-size: 12px;
+  color: #8a9a94;
+  max-width: 420px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.role-select {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.role-card {
+  border: 1.5px solid rgba(15, 107, 82, 0.15);
+  border-radius: 10px;
+  background: white;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.role-card.active {
+  border-color: #2f8f70;
+  background: rgba(47, 143, 112, 0.06);
+}
+
+.role-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #17332a;
+}
+
+.role-card.active .role-card-title {
+  color: #0f6b52;
+}
+
+.role-card-desc {
+  font-size: 11px;
+  color: #8a9a94;
+}
+
+.pin-hint {
+  margin: -10px 0 0;
+  font-size: 11px;
+  color: #8a9a94;
+}
+
+.info-banner {
+  background: rgba(38, 102, 204, 0.08);
+  color: #2666cc;
+  font-size: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.modal-footer.spread {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-footer.center {
+  justify-content: center;
+}
+
+.modal-footer-right {
+  display: flex;
+  gap: 12px;
+}
+
+.remove-access-btn {
+  background: rgba(217, 83, 79, 0.1);
+  border: none;
+  color: #d9534f;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.remove-confirm-btn {
+  background: #d9534f;
+  border: none;
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 12px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.warning-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(217, 83, 79, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.warning-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.confirm-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #17332a;
+}
+
+.confirm-text {
+  margin: 0;
+  font-size: 13px;
+  color: #6c7d76;
+  line-height: 1.5;
 }
 </style>
