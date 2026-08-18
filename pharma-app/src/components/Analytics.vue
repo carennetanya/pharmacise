@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard-page">
-    <!-- Topbar -->
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" alt="Pharmacise logo" class="brand-logo" />
@@ -46,7 +45,6 @@
     </header>
 
     <div class="body">
-      <!-- Sidebar -->
       <aside class="sidebar">
         <nav class="nav-list">
           <button
@@ -63,8 +61,6 @@
 
         <button class="logs-btn">Recent Activity Logs</button>
       </aside>
-
-      <!-- Main content -->
       <main class="main-content">
         <div class="page-head">
           <div>

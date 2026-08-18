@@ -20,6 +20,12 @@
     <CashierInventory v-else-if="currentPage === 'inventory'" @navigate="currentPage = $event" />
   </template>
 
+  <template v-else-if="selectedRole === 'pharmacy-technician'">
+    <StaffDashboard v-if="currentPage === 'dashboard'" @navigate="currentPage = $event" />
+    <StaffInventory v-else-if="currentPage === 'inventory'" @navigate="currentPage = $event" />
+    <StaffOrders v-else-if="currentPage === 'orders'" @navigate="currentPage = $event" />
+  </template>
+
   <div v-else class="app">
     <RouterView />
   </div>
@@ -39,6 +45,9 @@ import Settings from './components/Settings.vue'
 import CashierDashboard from './components/CashierDashboard.vue'
 import CashierTransaction from './components/CashierTransaction.vue'
 import CashierInventory from './components/CashierInventory.vue'
+import StaffDashboard from './components/StaffDashboard.vue'
+import StaffInventory from './components/StaffInventory.vue'
+import StaffOrders from './components/StaffOrders.vue'
 
 const isLoading = ref(true)
 const selectedRole = ref(null)

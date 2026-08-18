@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard-page">
-    <!-- Topbar -->
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" alt="Pharmacise logo" class="brand-logo" />
@@ -46,7 +45,6 @@
     </header>
 
     <div class="body">
-      <!-- Sidebar -->
       <aside class="sidebar">
         <nav class="nav-list">
           <button
@@ -63,8 +61,6 @@
 
         <button class="logs-btn">Recent Activity Logs</button>
       </aside>
-
-      <!-- Main content -->
       <main class="main-content">
         <section class="summary-grid">
           <div class="summary-item">
@@ -86,7 +82,16 @@
           </div>
         </section>
 
-        <h1>Daftar Pesanan &amp; Penerimaan Barang (Purchase Orders &amp; Inbound)</h1>
+        <div class="section-header">
+          <h1>Daftar Pesanan &amp; Penerimaan Barang (Purchase Orders &amp; Inbound)</h1>
+          <button class="import-btn" @click="csvModalOpen = true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 15V3M12 3L7 8M12 3L17 8" stroke="#33443d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M4 15V18C4 19.1 4.9 20 6 20H18C19.1 20 20 19.1 20 18V15" stroke="#33443d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Import CSV
+          </button>
+        </div>
 
         <div class="table-card">
           <table>
@@ -102,7 +107,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(order, i) in orders" :key="i">
+              <tr v-for="order in orders" :key="order.id">
                 <td class="ref">{{ order.ref }}</td>
                 <td class="muted">{{ order.distributor }}</td>
                 <td class="muted">{{ order.orderDate }}</td>
@@ -123,7 +128,7 @@
 
         <div class="fab-area">
           <img src="/mascot.png" alt="Mascot" class="fab-mascot" />
-          <button class="fab" aria-label="Add order" @click="$emit('add-order')">
+          <button class="fab" aria-label="Add order" @click="orderModalOpen = true">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <line x1="12" y1="5" x2="12" y2="19" stroke="white" stroke-width="2.2" stroke-linecap="round" />
               <line x1="5" y1="12" x2="19" y2="12" stroke="white" stroke-width="2.2" stroke-linecap="round" />
@@ -132,15 +137,33 @@
         </div>
       </main>
     </div>
+
+    <OrderFormModal
+      v-if="orderModalOpen"
+      @close="orderModalOpen = false"
+      @created="handleOrderCreated"
+    />
+
+    <CsvImportModal
+      v-if="csvModalOpen"
+      entity-type="orders"
+      @close="csvModalOpen = false"
+      @imported="handleCsvImported"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, h } from 'vue'
+import { ownerStore, addOrder, importOrderRows, updateOrderStatus } from '../store/ownerStore'
+import OrderFormModal from '../modals/OrderFormModal.vue'
+import CsvImportModal from '../modals/CsvImportModal.vue'
 
 const emit = defineEmits(['navigate', 'add-order'])
 
 const activeNav = ref('orders')
+const orderModalOpen = ref(false)
+const csvModalOpen = ref(false)
 
 function icon(paths) {
   return () =>
@@ -197,38 +220,7 @@ function goTo(id) {
   emit('navigate', id)
 }
 
-const orders = [
-  {
-    ref: '#PO-2026-089',
-    distributor: 'PT Kimia Farma Trading',
-    orderDate: '28 Jul 2026',
-    eta: '30 Jul 2026',
-    etaBold: false,
-    total: 'Rp 12.450.000',
-    status: 'awaiting',
-    actionLabel: 'Approve & Send PO'
-  },
-  {
-    ref: '#PO-2026-085',
-    distributor: 'PT Anugrah Argon Medica',
-    orderDate: '26 Jul 2026',
-    eta: 'Hari Ini (28 Jul)',
-    etaBold: true,
-    total: 'Rp 8.120.000',
-    status: 'transit',
-    actionLabel: 'Scan Faktur / Terima'
-  },
-  {
-    ref: '#PO-2026-081',
-    distributor: 'PT Mensa Bina Sukses',
-    orderDate: '22 Jul 2026',
-    eta: '24 Jul 2026',
-    etaBold: false,
-    total: 'Rp 15.300.000',
-    status: 'completed',
-    actionLabel: 'Lihat Detail & Invoice'
-  }
-]
+const orders = ownerStore.orders
 
 function statusLabel(status) {
   if (status === 'awaiting') return 'Awaiting Approval'
@@ -237,7 +229,22 @@ function statusLabel(status) {
 }
 
 function handleAction(order) {
-  emit('add-order', order)
+  if (order.status === 'awaiting') {
+    updateOrderStatus(order.id, 'transit', 'Scan Faktur / Terima')
+  } else if (order.status === 'transit') {
+    updateOrderStatus(order.id, 'completed', 'Lihat Detail & Invoice')
+  } else {
+    emit('add-order', order)
+  }
+}
+
+function handleOrderCreated(payload) {
+  addOrder(payload)
+  orderModalOpen.value = false
+}
+
+function handleCsvImported({ rows, distributor }) {
+  importOrderRows(distributor, rows)
 }
 </script>
 
@@ -457,10 +464,38 @@ function handleAction(order) {
 }
 
 .main-content h1 {
-  margin: 0 0 18px;
+  margin: 0;
   font-family: 'Poppins', 'Nunito', sans-serif;
   font-size: 18px;
   color: #17332a;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.import-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid rgba(15, 107, 82, 0.12);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #33443d;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.import-btn svg {
+  width: 15px;
+  height: 15px;
 }
 
 /* Summary cards (transparent, no card boundaries per design) */

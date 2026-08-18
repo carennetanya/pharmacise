@@ -180,7 +180,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { ownerStore } from '../../store/ownerStore'
+import { ownerStore } from '../store/ownerStore'
 
 const emit = defineEmits(['close', 'received'])
 

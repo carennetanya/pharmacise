@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard-page">
-    <!-- Topbar -->
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" alt="Pharmacise logo" class="brand-logo" />
@@ -46,7 +45,6 @@
     </header>
 
     <div class="body">
-      <!-- Sidebar -->
       <aside class="sidebar">
         <nav class="nav-list">
           <button
@@ -63,8 +61,6 @@
 
         <button class="logs-btn">Recent Activity Logs</button>
       </aside>
-
-      <!-- Main content -->
       <main class="main-content">
         <h1>Inventory</h1>
 
@@ -94,6 +90,22 @@
             </svg>
             Category
           </button>
+
+          <button class="filter-btn" @click="csvModalOpen = true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 15V3M12 3L7 8M12 3L17 8" stroke="#33443d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M4 15V18C4 19.1 4.9 20 6 20H18C19.1 20 20 19.1 20 18V15" stroke="#33443d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Import CSV
+          </button>
+
+          <button class="filter-btn" @click="ocrModalOpen = true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 8C4 6.9 4.9 6 6 6H7.5L8.5 4H15.5L16.5 6H18C19.1 6 20 6.9 20 8V17C20 18.1 19.1 19 18 19H6C4.9 19 4 18.1 4 17V8Z" stroke="#33443d" stroke-width="1.6" stroke-linejoin="round" />
+              <circle cx="12" cy="12.5" r="3.2" stroke="#33443d" stroke-width="1.6" />
+            </svg>
+            Scan Faktur
+          </button>
         </div>
 
         <div class="table-card">
@@ -120,13 +132,19 @@
                   <span class="status-pill" :class="item.status">{{ statusLabel(item.status) }}</span>
                 </td>
                 <td class="col-actions">
-                  <button class="more-btn" aria-label="More actions">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="5" cy="12" r="1.8" fill="#889690" />
-                      <circle cx="12" cy="12" r="1.8" fill="#889690" />
-                      <circle cx="19" cy="12" r="1.8" fill="#889690" />
-                    </svg>
-                  </button>
+                  <div class="more-menu-wrap">
+                    <button class="more-btn" aria-label="More actions" @click="toggleMenu(item.id)">
+                      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="5" cy="12" r="1.8" fill="#889690" />
+                        <circle cx="12" cy="12" r="1.8" fill="#889690" />
+                        <circle cx="19" cy="12" r="1.8" fill="#889690" />
+                      </svg>
+                    </button>
+                    <div v-if="openMenuId === item.id" class="more-menu">
+                      <button @click="openEdit(item)">Edit</button>
+                      <button class="danger" @click="openDelete(item)">Hapus</button>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -135,7 +153,7 @@
 
         <div class="fab-area">
           <img src="/mascot.png" alt="Mascot" class="fab-mascot" />
-          <button class="fab" aria-label="Add medicine" @click="$emit('add-medicine')">
+          <button class="fab" aria-label="Add medicine" @click="openAdd">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <line x1="12" y1="5" x2="12" y2="19" stroke="white" stroke-width="2.2" stroke-linecap="round" />
               <line x1="5" y1="12" x2="19" y2="12" stroke="white" stroke-width="2.2" stroke-linecap="round" />
@@ -144,16 +162,59 @@
         </div>
       </main>
     </div>
+
+    <InventoryItemModal
+      v-if="formModalOpen"
+      :item="editingItem"
+      @close="formModalOpen = false"
+      @save="handleSave"
+      @delete="handleDeleteFromForm"
+    />
+
+    <ConfirmModal
+      v-if="deleteTarget"
+      title="Hapus Item Inventory"
+      :message="`Apakah Anda yakin ingin menghapus ${deleteTarget.name}? Tindakan ini tidak dapat dibatalkan.`"
+      confirm-label="Ya, Hapus"
+      danger
+      @cancel="deleteTarget = null"
+      @confirm="confirmDelete"
+    />
+
+    <CsvImportModal
+      v-if="csvModalOpen"
+      entity-type="inventory"
+      @close="csvModalOpen = false"
+      @imported="handleCsvImported"
+    />
+
+    <InvoiceOcrModal
+      v-if="ocrModalOpen"
+      @close="ocrModalOpen = false"
+      @received="handleInvoiceReceived"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, h } from 'vue'
+import { ownerStore, addInventoryItem, updateInventoryItem, deleteInventoryItem, importInventoryRows, applyInvoiceReceipt } from '../store/ownerStore'
+import InventoryItemModal from '../modals/InventoryItemModal.vue'
+import ConfirmModal from '../modals/ConfirmModal.vue'
+import CsvImportModal from '../modals/CsvImportModal.vue'
+import InvoiceOcrModal from '../modals/InvoiceOcrModal.vue'
 
 const emit = defineEmits(['navigate', 'add-medicine'])
 
 const activeNav = ref('inventory')
 const query = ref('')
+
+const openMenuId = ref(null)
+const formModalOpen = ref(false)
+const editingItem = ref(null)
+const deleteTarget = ref(null)
+const csvModalOpen = ref(false)
+const ocrModalOpen = ref(false)
 
 function goTo(id) {
   activeNav.value = id
@@ -210,23 +271,62 @@ const navItems = [
   }
 ]
 
-const items = [
-  { name: 'Paracetamol 500mg', batch: 'PC0421', expired: '12/2027', stock: 500, status: 'available' },
-  { name: 'Amoxicillin 500mg', batch: 'AM0421', expired: '14/08/2026', stock: 100, status: 'critical' },
-  { name: 'Amlodipine 5mg', batch: 'AL0421', expired: '06/2027', stock: 500, status: 'available' },
-  { name: 'Vitamin C 1000mg', batch: 'VC0421', expired: '02/2027', stock: 300, status: 'low-stock' },
-  { name: 'Piroxicam 20mg', batch: 'PX0421', expired: '11/2027', stock: 500, status: 'available' },
-  { name: 'Diclofenac sodium 50mg', batch: 'DF0421', expired: '06/2027', stock: 500, status: 'available' },
-  { name: 'Diclofenac sodium 50mg', batch: 'DF0421', expired: '06/2027', stock: 500, status: 'available' }
-]
+const items = computed(() => ownerStore.inventory)
 
 const filteredItems = computed(() => {
-  if (!query.value.trim()) return items
+  if (!query.value.trim()) return items.value
   const q = query.value.toLowerCase()
-  return items.filter(
+  return items.value.filter(
     (item) => item.name.toLowerCase().includes(q) || item.batch.toLowerCase().includes(q)
   )
 })
+
+function toggleMenu(id) {
+  openMenuId.value = openMenuId.value === id ? null : id
+}
+
+function openAdd() {
+  editingItem.value = null
+  formModalOpen.value = true
+}
+
+function openEdit(item) {
+  openMenuId.value = null
+  editingItem.value = item
+  formModalOpen.value = true
+}
+
+function openDelete(item) {
+  openMenuId.value = null
+  deleteTarget.value = item
+}
+
+function confirmDelete() {
+  deleteInventoryItem(deleteTarget.value.id)
+  deleteTarget.value = null
+}
+
+function handleSave(payload) {
+  if (payload.id) {
+    updateInventoryItem(payload.id, payload)
+  } else {
+    addInventoryItem(payload)
+  }
+  formModalOpen.value = false
+}
+
+function handleDeleteFromForm(id) {
+  deleteInventoryItem(id)
+  formModalOpen.value = false
+}
+
+function handleCsvImported({ rows }) {
+  importInventoryRows(rows)
+}
+
+function handleInvoiceReceived({ items: receivedItems, meta }) {
+  applyInvoiceReceipt(receivedItems, meta)
+}
 
 function rowClass(status) {
   if (status === 'critical') return 'row-critical'
@@ -599,6 +699,10 @@ td.expired.low {
   color: #b8940f;
 }
 
+.more-menu-wrap {
+  position: relative;
+}
+
 .more-btn {
   background: none;
   border: none;
@@ -610,6 +714,41 @@ td.expired.low {
 .more-btn svg {
   width: 18px;
   height: 18px;
+}
+
+.more-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  background: white;
+  border: 1px solid rgba(15, 107, 82, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 51, 42, 0.14);
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.more-menu button {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #33443d;
+  cursor: pointer;
+}
+
+.more-menu button:hover {
+  background: #f3f6f5;
+}
+
+.more-menu button.danger {
+  color: #d9534f;
 }
 
 /* Floating action button */

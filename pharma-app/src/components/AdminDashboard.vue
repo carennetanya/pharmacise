@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard-page">
-    <!-- Topbar -->
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" alt="Pharmacise logo" class="brand-logo" />
@@ -46,7 +45,6 @@
     </header>
 
     <div class="body">
-      <!-- Sidebar -->
       <aside class="sidebar">
         <nav class="nav-list">
           <button
@@ -63,8 +61,6 @@
 
         <button class="logs-btn">Recent Activity Logs</button>
       </aside>
-
-      <!-- Main content -->
       <main class="main-content">
         <h1>Main Dashboard</h1>
 
@@ -190,7 +186,6 @@ function goTo(id) {
   emit('navigate', id)
 }
 
-// simple inline icon factory to keep template clean
 function icon(paths) {
   return () =>
     h(
@@ -241,7 +236,6 @@ const navItems = [
   }
 ]
 
-// heatmap: array of status classes to color each cell
 const heatmapCells = [
   'blank', 'safe', 'critical', 'safe', 'safe', 'safe', 'blank', 'blank', 'critical', 'safe',
   'caution', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank',

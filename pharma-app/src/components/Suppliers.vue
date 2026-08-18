@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard-page">
-    <!-- Topbar -->
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" alt="Pharmacise logo" class="brand-logo" />
@@ -46,7 +45,6 @@
     </header>
 
     <div class="body">
-      <!-- Sidebar -->
       <aside class="sidebar">
         <nav class="nav-list">
           <button
@@ -63,8 +61,6 @@
 
         <button class="logs-btn">Recent Activity Logs</button>
       </aside>
-
-      <!-- Main content -->
       <main class="main-content">
         <h1>Suppliers</h1>
         <p class="page-subtitle">Kelola data distributor (PBF) obat dan hubungan pemasok Anda.</p>
@@ -91,7 +87,7 @@
 
         <div class="section-header">
           <h2>Daftar Distributor (Supplier Directory)</h2>
-          <button class="add-btn">+ Add Supplier</button>
+          <button class="add-btn" @click="openAdd">+ Add Supplier</button>
         </div>
 
         <div class="table-card">
@@ -108,17 +104,17 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(supplier, i) in suppliers" :key="i">
+              <tr v-for="supplier in suppliers" :key="supplier.id">
                 <td class="name">{{ supplier.name }}</td>
                 <td class="muted">{{ supplier.contact }}</td>
                 <td class="muted">{{ supplier.phone }}</td>
                 <td class="email">{{ supplier.email }}</td>
                 <td class="muted">{{ supplier.products }}</td>
                 <td>
-                  <span class="status-pill">{{ supplier.status }}</span>
+                  <span class="status-pill" :class="{ inactive: supplier.status === 'Inactive' }">{{ supplier.status }}</span>
                 </td>
                 <td>
-                  <button class="profile-btn" @click="$emit('view-supplier', supplier)">Lihat Profil</button>
+                  <button class="profile-btn" @click="openEdit(supplier)">Lihat Profil</button>
                 </td>
               </tr>
             </tbody>
@@ -126,15 +122,39 @@
         </div>
       </main>
     </div>
+
+    <SupplierModal
+      v-if="modalOpen"
+      :supplier="editingSupplier"
+      @close="modalOpen = false"
+      @save="handleSave"
+      @delete="openDeleteConfirm"
+    />
+
+    <ConfirmModal
+      v-if="deleteTarget"
+      title="Hapus Supplier"
+      :message="`Apakah Anda yakin ingin menghapus ${deleteTarget.name} dari daftar distributor?`"
+      confirm-label="Ya, Hapus"
+      danger
+      @cancel="deleteTarget = null"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, h } from 'vue'
+import { ownerStore, addSupplier, updateSupplier, deleteSupplier } from '../store/ownerStore'
+import SupplierModal from '../modals/SupplierModal.vue'
+import ConfirmModal from '../modals/ConfirmModal.vue'
 
 const emit = defineEmits(['navigate', 'view-supplier'])
 
 const activeNav = ref('suppliers')
+const modalOpen = ref(false)
+const editingSupplier = ref(null)
+const deleteTarget = ref(null)
 
 function icon(paths) {
   return () =>
@@ -191,40 +211,36 @@ function goTo(id) {
   emit('navigate', id)
 }
 
-const suppliers = [
-  {
-    name: 'PT Kimia Farma Trading',
-    contact: 'Hendra Saputra',
-    phone: '+62 21-5550-1122',
-    email: 'hendra@kimiafarma.co.id',
-    products: '128 SKU',
-    status: 'Active'
-  },
-  {
-    name: 'PT Anugrah Argon Medica',
-    contact: 'Lestari Wulandari',
-    phone: '+62 21-5550-3344',
-    email: 'lestari@argonmedica.co.id',
-    products: '94 SKU',
-    status: 'Active'
-  },
-  {
-    name: 'PT Mensa Bina Sukses',
-    contact: 'Yusuf Prasetyo',
-    phone: '+62 21-5550-5566',
-    email: 'yusuf@mensabina.co.id',
-    products: '76 SKU',
-    status: 'Active'
-  },
-  {
-    name: 'PT Sumber Alam Farma',
-    contact: 'Ratna Dewi',
-    phone: '+62 21-5550-7788',
-    email: 'ratna@sumberalam.co.id',
-    products: '42 SKU',
-    status: 'Active'
+const suppliers = ownerStore.suppliers
+
+function openAdd() {
+  editingSupplier.value = null
+  modalOpen.value = true
+}
+
+function openEdit(supplier) {
+  editingSupplier.value = supplier
+  modalOpen.value = true
+}
+
+function handleSave(payload) {
+  if (payload.id) {
+    updateSupplier(payload.id, payload)
+  } else {
+    addSupplier(payload)
   }
-]
+  modalOpen.value = false
+}
+
+function openDeleteConfirm(id) {
+  deleteTarget.value = suppliers.find((s) => s.id === id)
+  modalOpen.value = false
+}
+
+function confirmDelete() {
+  deleteSupplier(deleteTarget.value.id)
+  deleteTarget.value = null
+}
 </script>
 
 <style scoped>
@@ -570,6 +586,11 @@ td.email {
   border-radius: 999px;
   background: rgba(47, 143, 112, 0.12);
   color: #2f8f70;
+}
+
+.status-pill.inactive {
+  background: rgba(137, 150, 144, 0.15);
+  color: #6c7d76;
 }
 
 .profile-btn {

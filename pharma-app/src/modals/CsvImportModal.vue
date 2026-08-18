@@ -125,7 +125,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { ownerStore } from '../../store/ownerStore'
+import { ownerStore } from '../store/ownerStore'
 
 const props = defineProps({
   entityType: { type: String, default: 'inventory' } // 'inventory' | 'orders'

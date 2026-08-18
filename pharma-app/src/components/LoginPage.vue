@@ -1,6 +1,5 @@
 <template>
   <div class="login-page">
-    <!-- Left side -->
     <div class="left-panel">
       <nav class="navbar">
         <img src="/logo.png" alt="Pharmacise logo" class="logo-icon" />
@@ -12,8 +11,6 @@
         <img src="/mascot.png" alt="Pharmacise mascot" class="mascot" />
       </div>
     </div>
-
-    <!-- Right side -->
     <div class="right-panel">
       <div class="form-wrap">
         <h1>Welcome back!</h1>
