@@ -10,7 +10,7 @@
           </svg>
         </button>
       </div>
-      <p class="modal-sub">{{ isEdit ? 'Perbarui data dan hak akses staf ini.' : 'Undang anggota tim baru dan atur peran akses mereka.' }}</p>
+      <p class="modal-sub">{{ isEdit ? 'Perbarui data dan hak akses akun ini.' : 'Buat akun Staff atau Cashier baru.' }}</p>
 
       <form @submit.prevent="handleSubmit">
         <div class="field-grid">
@@ -22,6 +22,10 @@
             <label>Email</label>
             <input v-model="form.email" type="email" placeholder="nama@pharmacise.id" required />
           </div>
+          <div v-if="!isEdit" class="field wide">
+            <label>Password Login</label>
+            <input v-model="form.password" type="password" minlength="8" placeholder="Minimal 8 karakter" required />
+          </div>
           <div class="field">
             <label>No. Telepon</label>
             <input v-model="form.phone" type="text" placeholder="0812-xxxx-xxxx" />
@@ -29,7 +33,6 @@
           <div class="field">
             <label>Peran (Role)</label>
             <select v-model="form.role">
-              <option value="Owner">Owner</option>
               <option value="Staff">Staff</option>
               <option value="Cashier">Cashier</option>
             </select>
@@ -47,7 +50,7 @@
           <button v-if="isEdit" type="button" class="delete-btn" @click="$emit('remove-access', member.id)">Cabut Akses</button>
           <div class="spacer"></div>
           <button type="button" class="cancel-btn" @click="$emit('close')">Batal</button>
-          <button type="submit" class="save-btn">{{ isEdit ? 'Simpan Perubahan' : 'Tambahkan Staf' }}</button>
+          <button type="submit" class="save-btn">{{ isEdit ? 'Simpan Perubahan' : 'Tambahkan Akun' }}</button>
         </div>
       </form>
     </div>
@@ -69,6 +72,7 @@ const form = ref({
   name: props.member?.name || '',
   email: props.member?.email || '',
   phone: props.member?.phone || '',
+  password: '',
   role: props.member?.role || 'Staff',
   status: props.member?.status || 'active'
 })

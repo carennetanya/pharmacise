@@ -31,16 +31,7 @@
           <span class="badge">3</span>
         </button>
 
-        <div class="profile">
-          <div class="avatar">A</div>
-          <div class="profile-text">
-            <span class="role">Pharmacist in charge</span>
-            <span class="name">Dr. Aris</span>
-          </div>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 9L12 15L18 9" stroke="#334" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
+        <UserProfileMenu @logout="emit('logout')" />
       </div>
     </header>
 
@@ -59,7 +50,7 @@
           </button>
         </nav>
 
-        <button class="logs-btn">Recent Activity Logs</button>
+        <button class="logs-btn" @click="goTo('activity-logs')">Recent Activity Logs</button>
       </aside>
       <main class="main-content">
         <h1>Main Dashboard</h1>
@@ -74,7 +65,7 @@
               </svg>
               <span>EXPIRY ALERT (&lt; 3 Months)</span>
             </div>
-            <p class="stat-value red">12 Medicines</p>
+            <p class="stat-value red">{{ expiryAlertCount }} Medicines</p>
             <span class="stat-tag red">Requires Action</span>
           </div>
 
@@ -85,7 +76,7 @@
               </svg>
               <span>LOW STOCK (Below ROP)</span>
             </div>
-            <p class="stat-value amber">5 Items</p>
+            <p class="stat-value amber">{{ lowStockCount }} Items</p>
             <span class="stat-tag amber">Review Reorder</span>
           </div>
 
@@ -98,7 +89,7 @@
               </svg>
               <span>TOTAL INVENTORY VALUE</span>
             </div>
-            <p class="stat-value green">Rp 145.20M</p>
+            <p class="stat-value green">{{ formatCurrency(inventoryValue) }}</p>
             <span class="stat-tag green">Current Assets</span>
           </div>
 
@@ -110,7 +101,7 @@
               </svg>
               <span>DRAFT AUTO-RESTOCK POs</span>
             </div>
-            <p class="stat-value blue">2 Pending</p>
+            <p class="stat-value blue">{{ draftPoCount }} Pending</p>
             <span class="stat-tag blue">Awaiting Approval</span>
           </div>
         </section>
@@ -146,7 +137,7 @@
               </div>
             </div>
 
-            <button class="detail-btn">View Detailed Inventory</button>
+            <button class="detail-btn" @click="goTo('inventory')">View Detailed Inventory</button>
           </div>
 
           <div class="restock-panel">
@@ -166,7 +157,7 @@
               </li>
             </ul>
 
-            <button class="approve-btn">Approve &amp; Send All POs to Suppliers</button>
+            <button class="approve-btn" @click="approvePendingOrders">Approve &amp; Send All POs to Suppliers</button>
           </div>
         </section>
       </main>
@@ -175,11 +166,15 @@
 </template>
 
 <script setup>
-import { ref, h } from 'vue'
+import { ref, computed, h } from 'vue'
+import UserProfileMenu from './UserProfileMenu.vue'
+import { ownerStore, updateOrderStatus } from '../store/ownerStore'
 
-const emit = defineEmits(['navigate'])
+const emit = defineEmits(['navigate', 'logout'])
 
 const activeNav = ref('dashboard')
+const inventory = computed(() => ownerStore.inventory)
+const orders = computed(() => ownerStore.orders)
 
 function goTo(id) {
   activeNav.value = id
@@ -194,6 +189,67 @@ function icon(paths) {
       paths.map((p) => h('path', p))
     )
 }
+
+function parseExpiry(dateString) {
+  if (!dateString || !dateString.includes('/')) return null
+
+  const [day, month, year] = String(dateString).split('/')
+  const parsed = new Date(Number(year), Number(month) - 1, Number(day))
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+function isExpiringSoon(item) {
+  const expiryDate = parseExpiry(item.expired)
+  if (!expiryDate) return item.status === 'critical' || item.stock <= 20
+
+  const now = new Date()
+  const diff = expiryDate.getTime() - now.getTime()
+  const months = diff / (1000 * 60 * 60 * 24 * 30)
+  return months <= 3
+}
+
+const expiryAlertCount = computed(() => inventory.value.filter((item) => isExpiringSoon(item)).length)
+const lowStockCount = computed(() => inventory.value.filter((item) => item.stock <= 150 || item.status === 'low-stock' || item.status === 'critical').length)
+const inventoryValue = computed(() =>
+  inventory.value.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.stock || 0), 0)
+)
+const draftPoCount = computed(() => orders.value.filter((order) => order.status === 'awaiting').length)
+
+const heatmapCells = computed(() => [
+  'blank', 'safe', 'critical', 'safe', 'safe', 'safe', 'blank', 'blank', 'critical', 'safe',
+  'caution', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank',
+  'safe', 'blank', 'safe', 'safe', 'safe', 'safe', 'safe', 'blank', 'blank', 'blank',
+  'safe', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank',
+  'safe', 'blank', 'blank', 'critical', 'caution', 'critical', 'caution', 'blank', 'blank', 'blank',
+  'safe', 'blank', 'critical', 'critical', 'caution', 'caution', 'caution', 'blank', 'blank', 'blank',
+  'safe', 'blank', 'safe', 'safe', 'caution', 'safe', 'caution', 'blank', 'blank', 'blank',
+  'safe', 'blank', 'safe', 'safe', 'caution', 'caution', 'caution', 'blank', 'blank', 'blank',
+  'caution', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank',
+  'caution', 'safe', 'safe', 'safe', 'safe', 'blank', 'safe', 'blank', 'blank', 'blank'
+])
+
+const restockItems = computed(() => {
+  const items = inventory.value
+    .filter((item) => item.stock <= 150 || item.status === 'low-stock' || item.status === 'critical')
+    .slice(0, 6)
+
+  if (items.length) {
+    return items.map((item, index) => ({
+      label: `${item.name} - Buy ${Math.max(10, Math.round((150 - item.stock) / 5) * 10)} Units`,
+      status: index % 2 === 0 ? 'up' : 'down'
+    }))
+  }
+
+  return [
+    { label: 'Amlodipine 5mg - Buy 50 Boxes', status: 'draft' },
+    { label: 'Amlodipine 5mg - Buy 20 Boxes', status: 'up' },
+    { label: 'Amlodipine 5mg - Buy 20 Boxes', status: 'down' },
+    { label: 'Amlodipine 5mg - Buy 70 Boxes', status: 'up' },
+    { label: 'Amlodipine 5mg - Buy 15 Boxes', status: 'up' },
+    { label: 'Amlodipine 5mg - Buy 50 Boxes', status: 'down' }
+  ]
+})
 
 const navItems = [
   {
@@ -236,28 +292,20 @@ const navItems = [
   }
 ]
 
-const heatmapCells = [
-  'blank', 'safe', 'critical', 'safe', 'safe', 'safe', 'blank', 'blank', 'critical', 'safe',
-  'caution', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank',
-  'safe', 'blank', 'safe', 'safe', 'safe', 'safe', 'safe', 'blank', 'blank', 'blank',
-  'safe', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank',
-  'safe', 'blank', 'blank', 'critical', 'caution', 'critical', 'caution', 'blank', 'blank', 'blank',
-  'safe', 'blank', 'critical', 'critical', 'caution', 'caution', 'caution', 'blank', 'blank', 'blank',
-  'safe', 'blank', 'safe', 'safe', 'caution', 'safe', 'caution', 'blank', 'blank', 'blank',
-  'safe', 'blank', 'safe', 'safe', 'caution', 'caution', 'caution', 'blank', 'blank', 'blank',
-  'caution', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank', 'blank',
-  'caution', 'safe', 'safe', 'safe', 'safe', 'blank', 'safe', 'blank', 'blank', 'blank'
-]
+function formatCurrency(value) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0
+  }).format(value || 0)
+}
 
-const restockItems = [
-  { label: 'Amlodipine 5mg - Buy 50 Boxes', status: 'draft' },
-  { label: 'Amlodipine 5mg - Buy 20 Boxes', status: 'up' },
-  { label: 'Amlodipine 5mg - Buy 20 Boxes', status: 'down' },
-  { label: 'Amlodipine 5mg - Buy 70 Boxes', status: 'up' },
-  { label: 'Amlodipine 5mg - Buy 15 Boxes', status: 'up' },
-  { label: 'Amlodipine 5mg - Buy 50 Boxes', status: 'down' },
-  { label: 'Amlodipine 5mg - Buy 20 Boxes', status: 'up' }
-]
+function approvePendingOrders() {
+  const pendingOrders = orders.value.filter((order) => order.status === 'awaiting')
+  pendingOrders.forEach((order) => {
+    updateOrderStatus(order.id, 'transit', 'Scan Faktur / Terima')
+  })
+}
 </script>
 
 <style scoped>

@@ -1,13 +1,7 @@
--- ============================================================================
--- Pharmacise — "Info Apotek" backend (pharmacy profile + staff/cashier access)
--- Run this in the Supabase SQL editor, or via `supabase db push`.
--- ============================================================================
-
 create extension if not exists "pgcrypto";
 
--- ----------------------------------------------------------------------------
 -- 1. pharmacies — one row per owner/pharmacist account
--- ----------------------------------------------------------------------------
+
 create table if not exists public.pharmacies (
   id              uuid primary key default gen_random_uuid(),
   owner_id        uuid not null references auth.users(id) on delete cascade,
@@ -24,9 +18,8 @@ create table if not exists public.pharmacies (
 
 comment on table public.pharmacies is 'One pharmacy profile per owner account (Info Apotek tab).';
 
--- ----------------------------------------------------------------------------
 -- 2. pharmacy_staff — staff & cashier accounts belonging to a pharmacy
--- ----------------------------------------------------------------------------
+
 create table if not exists public.pharmacy_staff (
   id            uuid primary key default gen_random_uuid(),
   pharmacy_id   uuid not null references public.pharmacies(id) on delete cascade,
@@ -35,8 +28,8 @@ create table if not exists public.pharmacy_staff (
   phone         text default '',
   role          text not null check (role in ('Staff', 'Cashier')),
   status        text not null default 'active' check (status in ('active', 'inactive')),
-  pin_hash      text, -- bcrypt hash of the 4-digit POS PIN, never store/return plaintext
-  auth_user_id  uuid references auth.users(id) on delete set null, -- optional, if the staff member also gets a Supabase Auth login
+  pin_hash      text,
+  auth_user_id  uuid references auth.users(id) on delete set null, 
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   unique (pharmacy_id, email)
@@ -44,9 +37,8 @@ create table if not exists public.pharmacy_staff (
 
 comment on table public.pharmacy_staff is 'Staff / cashier rows managed from the Info Apotek tab.';
 
--- ----------------------------------------------------------------------------
 -- 3. updated_at triggers
--- ----------------------------------------------------------------------------
+
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
@@ -65,9 +57,8 @@ create trigger trg_pharmacy_staff_updated_at
   before update on public.pharmacy_staff
   for each row execute function public.set_updated_at();
 
--- ----------------------------------------------------------------------------
 -- 4. Row Level Security
--- ----------------------------------------------------------------------------
+
 alter table public.pharmacies enable row level security;
 alter table public.pharmacy_staff enable row level security;
 
@@ -86,7 +77,6 @@ create policy "pharmacies_update_own" on public.pharmacies
 
 -- Staff rows are visible/editable only to the owner of the parent pharmacy.
 -- Note: there is deliberately NO insert policy here — new staff must go
--- through the add_pharmacy_staff() RPC below so the PIN gets hashed
 -- server-side and is never sent to the client in plaintext.
 drop policy if exists "pharmacy_staff_select_owner" on public.pharmacy_staff;
 create policy "pharmacy_staff_select_owner" on public.pharmacy_staff
@@ -121,9 +111,8 @@ create policy "pharmacy_staff_delete_owner" on public.pharmacy_staff
 -- Client updates should never be able to touch pin_hash directly.
 revoke update (pin_hash) on public.pharmacy_staff from authenticated;
 
--- ----------------------------------------------------------------------------
 -- 5. RPCs — the only way to create a staff row or change a PIN
--- ----------------------------------------------------------------------------
+
 create or replace function public.add_pharmacy_staff(
   p_pharmacy_id uuid,
   p_name        text,
@@ -188,7 +177,6 @@ begin
 end;
 $$;
 
--- Optional: used by the POS/cashier login screen to verify a PIN without
 -- ever exposing pin_hash to the client. Returns the staff row on success.
 create or replace function public.verify_staff_pin(
   p_pharmacy_id uuid,
@@ -222,9 +210,8 @@ grant execute on function public.add_pharmacy_staff(uuid, text, text, text, text
 grant execute on function public.set_staff_pin(uuid, text) to authenticated;
 grant execute on function public.verify_staff_pin(uuid, text, text) to authenticated, anon;
 
--- ----------------------------------------------------------------------------
 -- 6. Storage bucket for pharmacy logos
--- ----------------------------------------------------------------------------
+
 insert into storage.buckets (id, name, public)
 values ('pharmacy-logos', 'pharmacy-logos', true)
 on conflict (id) do nothing;
@@ -233,8 +220,6 @@ drop policy if exists "pharmacy_logos_public_read" on storage.objects;
 create policy "pharmacy_logos_public_read" on storage.objects
   for select using (bucket_id = 'pharmacy-logos');
 
--- Each owner may only write into a folder named after their own user id,
--- e.g. `${auth.uid()}/logo.png`.
 drop policy if exists "pharmacy_logos_owner_write" on storage.objects;
 create policy "pharmacy_logos_owner_write" on storage.objects
   for insert with check (

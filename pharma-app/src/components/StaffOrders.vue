@@ -31,16 +31,7 @@
           <span class="badge">2</span>
         </button>
 
-        <div class="profile">
-          <div class="avatar">S</div>
-          <div class="profile-text">
-            <span class="role">Pharmacy Technician</span>
-            <span class="name">Siti Rahma</span>
-          </div>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 9L12 15L18 9" stroke="#334" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
+        <UserProfileMenu @logout="$emit('logout')" />
       </div>
     </header>
 
@@ -137,6 +128,7 @@
 <script setup>
 import { ref, computed, h } from 'vue'
 import { ownerStore, applyInvoiceReceipt, updateOrderStatus } from '../store/ownerStore'
+import UserProfileMenu from './UserProfileMenu.vue'
 import InvoiceOcrModal from '../modals/InvoiceOcrModal.vue'
 
 const emit = defineEmits(['navigate'])
@@ -363,7 +355,7 @@ function handleInvoiceReceived({ items, meta }) {
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: linear-gradient(200deg, #14523f 55%, #081f1c 130%);
+  background: linear-gradient(200deg, #21857a 55%, #081f1c 130%);
   min-height: calc(100vh - 61px);
   padding: 22px 12px;
 }

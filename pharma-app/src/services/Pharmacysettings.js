@@ -86,6 +86,36 @@ export async function fetchStaff(pharmacyId) {
 }
 
 /**
+ * Creates a Supabase Auth account and links it to pharmacy_staff.
+ * The service-role key stays inside the Edge Function.
+ */
+export async function createStaffAccount({ pharmacyId, name, email, phone, role, password }) {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError) throw sessionError
+  if (!sessionData.session) throw new Error('Sesi admin sudah berakhir. Silakan login ulang.')
+
+  const { data, error } = await supabase.functions.invoke('create-staff-user', {
+    body: { pharmacyId, name, email, phone, role, password },
+    headers: { Authorization: `Bearer ${sessionData.session.access_token}` }
+  })
+
+  if (error) {
+    let message = error.message || 'Failed to send a request to the Edge Function.'
+    if (error.context instanceof Response) {
+      try {
+        const body = await error.context.json()
+        message = body.error || body.message || message
+      } catch {
+        // Keep the original FunctionsError when the response is not JSON.
+      }
+    }
+    throw new Error(message)
+  }
+  if (data?.error) throw new Error(data.error)
+  return data.staff
+}
+
+/**
  * Creates a staff/cashier account. PIN is hashed server-side via RPC —
  * it is never stored or transmitted as plaintext after this call.
  */
@@ -135,9 +165,20 @@ export async function setStaffPin(staffId, pin) {
 }
 
 /**
- * Revokes a staff/cashier account entirely (matches the "Hapus Akses" UI).
+ * Changes a staff member's access status to inactive.
  */
 export async function removeStaffAccess(staffId) {
-  const { error } = await supabase.from('pharmacy_staff').delete().eq('id', staffId)
+  return setStaffAccessStatus(staffId, 'inactive')
+}
+
+export async function restoreStaffAccess(staffId) {
+  return setStaffAccessStatus(staffId, 'active')
+}
+
+async function setStaffAccessStatus(staffId, status) {
+  const { error } = await supabase
+    .from('pharmacy_staff')
+    .update({ status })
+    .eq('id', staffId)
   if (error) throw error
 }

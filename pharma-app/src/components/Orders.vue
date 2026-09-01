@@ -31,16 +31,7 @@
           <span class="badge">3</span>
         </button>
 
-        <div class="profile">
-          <div class="avatar">A</div>
-          <div class="profile-text">
-            <span class="role">Pharmacist in charge</span>
-            <span class="name">Dr. Aris</span>
-          </div>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 9L12 15L18 9" stroke="#334" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
+        <UserProfileMenu @logout="emit('logout')" />
       </div>
     </header>
 
@@ -59,7 +50,7 @@
           </button>
         </nav>
 
-        <button class="logs-btn">Recent Activity Logs</button>
+        <button class="logs-btn" @click="emit('navigate', 'activity-logs')">Recent Activity Logs</button>
       </aside>
       <main class="main-content">
         <section class="summary-grid">
@@ -155,11 +146,12 @@
 
 <script setup>
 import { ref, h } from 'vue'
+import UserProfileMenu from './UserProfileMenu.vue'
 import { ownerStore, addOrder, importOrderRows, updateOrderStatus } from '../store/ownerStore'
 import OrderFormModal from '../modals/OrderFormModal.vue'
 import CsvImportModal from '../modals/CsvImportModal.vue'
 
-const emit = defineEmits(['navigate', 'add-order'])
+const emit = defineEmits(['navigate', 'add-order', 'logout'])
 
 const activeNav = ref('orders')
 const orderModalOpen = ref(false)

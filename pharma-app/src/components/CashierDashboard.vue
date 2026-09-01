@@ -31,16 +31,7 @@
           <span class="badge">3</span>
         </button>
 
-        <div class="profile">
-          <div class="avatar">A</div>
-          <div class="profile-text">
-            <span class="role">Cashier on Duty</span>
-            <span class="name">Andi Wijaya</span>
-          </div>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 9L12 15L18 9" stroke="#334" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
+        <UserProfileMenu @logout="$emit('logout')" />
       </div>
     </header>
 
@@ -166,6 +157,7 @@
 <script setup>
 import { ref, computed, h } from 'vue'
 import { cashierStore } from '../store/cashierStore'
+import UserProfileMenu from './UserProfileMenu.vue'
 
 const emit = defineEmits(['navigate'])
 

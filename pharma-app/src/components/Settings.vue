@@ -31,16 +31,7 @@
           <span class="badge">3</span>
         </button>
 
-        <div class="profile">
-          <div class="avatar">A</div>
-          <div class="profile-text">
-            <span class="role">Pharmacist in charge</span>
-            <span class="name">Dr. Aris</span>
-          </div>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 9L12 15L18 9" stroke="#334" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
+        <UserProfileMenu @logout="emit('logout')" />
       </div>
     </header>
 
@@ -59,7 +50,7 @@
           </button>
         </nav>
 
-        <button class="logs-btn">Recent Activity Logs</button>
+        <button class="logs-btn" @click="emit('navigate', 'activity-logs')">Recent Activity Logs</button>
       </aside>
 
       <main class="main-content">
@@ -68,10 +59,10 @@
 
         <div class="settings-layout">
           <div class="settings-nav">
-            <button class="settings-tab" :class="{ active: tab === 'profile' }" @click="tab = 'profile'">
+            <button class="settings-tab" :class="{ active: tab === 'profile' }" @click="changeTab('profile')">
               Profile
             </button>
-            <button class="settings-tab" :class="{ active: tab === 'pharmacy' }" @click="tab = 'pharmacy'">
+            <button class="settings-tab" :class="{ active: tab === 'pharmacy' }" @click="changeTab('pharmacy')">
               Info Apotek
             </button>
           </div>
@@ -97,7 +88,7 @@
                 </div>
                 <div class="field">
                   <label>Email</label>
-                  <input v-model="profile.email" type="email" />
+                  <input v-model="profile.email" type="email" readonly />
                 </div>
                 <div class="field">
                   <label>Nomor Telepon</label>
@@ -105,7 +96,7 @@
                 </div>
                 <div class="field">
                   <label>Peran</label>
-                  <input v-model="profile.role" type="text" />
+                  <input v-model="profile.role" type="text" readonly />
                 </div>
               </div>
             </div>
@@ -171,9 +162,28 @@
               <h2>Informasi Apotek</h2>
 
               <div class="avatar-row">
-                <div class="settings-avatar logo">🏥</div>
+                <img
+                  v-if="pharmacy.logo_url"
+                  :src="pharmacy.logo_url"
+                  alt="Logo apotek"
+                  class="settings-avatar logo-image"
+                  tabindex="0"
+                  role="button"
+                  @click="logoInput?.click()"
+                  @keydown.enter="logoInput?.click()"
+                />
+                <div
+                  v-else
+                  class="settings-avatar logo"
+                  tabindex="0"
+                  role="button"
+                  aria-label="Ganti logo apotek"
+                  @click="logoInput?.click()"
+                  @keydown.enter="logoInput?.click()"
+                >🏥</div>
                 <div>
-                  <button class="link-btn">Ganti Logo</button>
+                  <input ref="logoInput" class="logo-input" type="file" accept="image/png,image/jpeg,image/svg+xml" @change="handleLogoChange" />
+                  <button class="link-btn" type="button" @click="logoInput?.click()">Ganti Logo</button>
                   <p class="hint">SVG atau PNG dengan latar transparan</p>
                 </div>
               </div>
@@ -206,8 +216,8 @@
 
             <div class="card">
               <div class="staff-header">
-                <h3>Staf &amp; Akses</h3>
-                <button class="add-staff-btn" @click="openAddStaff">+ Tambah Staf</button>
+                <h3>Akun Staff &amp; Cashier</h3>
+                <button class="add-staff-btn" @click="openAddStaff">+ Tambah Staff/Cashier</button>
               </div>
 
               <table class="staff-table">
@@ -217,7 +227,7 @@
                     <th>Peran</th>
                     <th>Email</th>
                     <th>Status</th>
-                    <th></th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,7 +238,13 @@
                     <td><span class="status-pill" :class="member.status">{{ member.status === 'active' ? 'Aktif' : 'Nonaktif' }}</span></td>
                     <td class="actions">
                       <button class="text-btn" @click="openEditStaff(member)">Edit</button>
-                      <button class="text-btn danger" @click="openRemoveAccess(member)">Cabut Akses</button>
+                      <button
+                        class="text-btn"
+                        :class="{ danger: member.status === 'active' }"
+                        @click="handleAccessAction(member)"
+                      >
+                        {{ member.status === 'active' ? 'Cabut Akses' : 'Aktifkan Akses' }}
+                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -265,12 +281,24 @@
 </template>
 
 <script setup>
-import { ref, h } from 'vue'
-import { ownerStore, addStaffMember, updateStaffMember, removeStaffAccess } from '../store/ownerStore'
+import { onBeforeUnmount, onMounted, ref, h } from 'vue'
+import UserProfileMenu from './UserProfileMenu.vue'
+import {
+  createStaffAccount,
+  fetchMyPharmacy,
+  fetchStaff,
+  removeStaffAccess,
+  restoreStaffAccess,
+  savePharmacyInfo,
+  uploadPharmacyLogo,
+  updateStaffMember
+} from '../services/Pharmacysettings'
 import StaffModal from '../modals/StaffModal.vue'
 import ConfirmModal from '../modals/ConfirmModal.vue'
+import { updateOwnerProfile } from '../services/authService'
+import { sessionStore } from '../store/sessionStore'
 
-const emit = defineEmits(['navigate'])
+const emit = defineEmits(['navigate', 'logout'])
 
 const activeNav = ref('settings')
 const tab = ref('profile')
@@ -280,6 +308,7 @@ const editingStaff = ref(null)
 const removeAccessTarget = ref(null)
 
 function goTo(id) {
+  if (id !== 'settings' && !confirmLeaveIfNeeded()) return
   activeNav.value = id
   emit('navigate', id)
 }
@@ -335,9 +364,9 @@ const navItems = [
 ]
 
 const profile = ref({
-  name: 'Dr. Aris',
-  email: 'aris@pharmacise.id',
-  phone: '0812-3456-7890',
+  name: sessionStore.user?.user_metadata?.full_name || sessionStore.user?.email?.split('@')[0] || '',
+  email: sessionStore.user?.email || '',
+  phone: sessionStore.user?.user_metadata?.phone || '',
   role: 'Pharmacist in charge'
 })
 
@@ -351,11 +380,68 @@ const pharmacy = ref({
   name: 'Apotek Sehat Selalu',
   phone: '021-5550-1234',
   license: 'SIA-0421-JKT',
-  email: 'admin@apoteksehatselalu.id',
+  email: '',
   address: 'Jl. Melati Raya No. 12, Jakarta Selatan'
 })
 
-const staff = ownerStore.staff
+const staff = ref([])
+const pharmacyId = ref(null)
+const logoInput = ref(null)
+const savedProfile = ref('')
+const savedPharmacy = ref('')
+
+function profileSnapshot() {
+  return JSON.stringify({ name: profile.value.name, phone: profile.value.phone })
+}
+
+function pharmacySnapshot() {
+  return JSON.stringify(pharmacy.value)
+}
+
+function hasUnsavedChanges() {
+  if (tab.value === 'profile') return savedProfile.value !== profileSnapshot()
+  return savedPharmacy.value !== pharmacySnapshot()
+}
+
+function confirmLeaveIfNeeded() {
+  return !hasUnsavedChanges() || window.confirm('Ada perubahan yang belum disimpan. Tetap lanjut tanpa menyimpan?')
+}
+
+function changeTab(nextTab) {
+  if (nextTab !== tab.value && confirmLeaveIfNeeded()) tab.value = nextTab
+}
+
+function handleBeforeUnload(event) {
+  if (!hasUnsavedChanges()) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+async function loadBackendData() {
+  try {
+    const currentPharmacy = await fetchMyPharmacy()
+    if (!currentPharmacy) return
+
+    pharmacyId.value = currentPharmacy.id
+    pharmacy.value = {
+      name: currentPharmacy.name || '',
+      phone: currentPharmacy.phone || '',
+      license: currentPharmacy.license_number || '',
+      email: currentPharmacy.email || '',
+      address: currentPharmacy.address || '',
+      logo_url: currentPharmacy.logo_url || ''
+    }
+    savedProfile.value = profileSnapshot()
+    savedPharmacy.value = pharmacySnapshot()
+    staff.value = await fetchStaff(currentPharmacy.id)
+  } catch (error) {
+    window.alert(error.message || 'Data apotek gagal dimuat.')
+  }
+}
+
+onMounted(loadBackendData)
+onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload))
 
 function openAddStaff() {
   editingStaff.value = null
@@ -367,13 +453,35 @@ function openEditStaff(member) {
   staffModalOpen.value = true
 }
 
-function handleSaveStaff(payload) {
-  if (payload.id) {
-    updateStaffMember(payload.id, payload)
-  } else {
-    addStaffMember(payload)
+async function handleSaveStaff(payload) {
+  try {
+    if (!pharmacyId.value) throw new Error('Simpan informasi apotek terlebih dahulu.')
+
+    if (payload.id) {
+      await updateStaffMember(payload.id, payload)
+    } else {
+      await createStaffAccount({ pharmacyId: pharmacyId.value, ...payload })
+    }
+
+    staff.value = await fetchStaff(pharmacyId.value)
+    staffModalOpen.value = false
+  } catch (error) {
+    window.alert(error.message || 'Akun staff gagal disimpan.')
   }
-  staffModalOpen.value = false
+}
+
+async function handleAccessAction(member) {
+  if (member.status === 'active') {
+    removeAccessTarget.value = member
+    return
+  }
+
+  try {
+    await restoreStaffAccess(member.id)
+    staff.value = await fetchStaff(pharmacyId.value)
+  } catch (error) {
+    window.alert(error.message || 'Akses akun gagal diaktifkan.')
+  }
 }
 
 function openRemoveAccess(member) {
@@ -381,21 +489,61 @@ function openRemoveAccess(member) {
 }
 
 function openRemoveAccessFromForm(id) {
-  removeAccessTarget.value = staff.find((m) => m.id === id)
+  removeAccessTarget.value = staff.value.find((m) => m.id === id)
   staffModalOpen.value = false
 }
 
-function confirmRemoveAccess() {
-  removeStaffAccess(removeAccessTarget.value.id)
-  removeAccessTarget.value = null
+async function confirmRemoveAccess() {
+  try {
+    await removeStaffAccess(removeAccessTarget.value.id)
+    staff.value = await fetchStaff(pharmacyId.value)
+    removeAccessTarget.value = null
+  } catch (error) {
+    window.alert(error.message || 'Akses staff gagal dicabut.')
+  }
 }
 
-function saveProfile() {
-  window.alert('Profil berhasil disimpan.')
+async function saveProfile() {
+  try {
+    const updatedUser = await updateOwnerProfile(profile.value)
+    sessionStore.user = updatedUser
+    profile.value.email = updatedUser.email || profile.value.email
+    savedProfile.value = profileSnapshot()
+    window.alert('Profil berhasil disimpan.')
+  } catch (error) {
+    window.alert(error.message || 'Profil gagal disimpan.')
+  }
 }
 
-function savePharmacy() {
-  window.alert('Informasi apotek berhasil disimpan.')
+async function savePharmacy() {
+  try {
+    const saved = await savePharmacyInfo(pharmacy.value)
+    pharmacyId.value = saved.id
+    staff.value = await fetchStaff(saved.id)
+    savedPharmacy.value = pharmacySnapshot()
+    window.alert('Informasi apotek berhasil disimpan.')
+  } catch (error) {
+    window.alert(error.message || 'Informasi apotek gagal disimpan.')
+  }
+}
+
+async function handleLogoChange(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  if (file.size > 2 * 1024 * 1024) {
+    window.alert('Ukuran logo maksimal 2MB.')
+    event.target.value = ''
+    return
+  }
+
+  try {
+    pharmacy.value.logo_url = await uploadPharmacyLogo(file)
+    await savePharmacy()
+  } catch (error) {
+    window.alert(error.message || 'Logo gagal diunggah.')
+  } finally {
+    event.target.value = ''
+  }
 }
 </script>
 
@@ -704,6 +852,23 @@ function savePharmacy() {
   border-radius: 16px;
   background: #eef4f2;
   font-size: 26px;
+  cursor: pointer;
+}
+
+.settings-avatar.logo-image {
+  object-fit: contain;
+  padding: 6px;
+  background: #eef4f2;
+  cursor: pointer;
+}
+
+.logo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .link-btn {

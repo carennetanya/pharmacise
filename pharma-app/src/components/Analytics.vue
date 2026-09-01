@@ -31,16 +31,7 @@
           <span class="badge">3</span>
         </button>
 
-        <div class="profile">
-          <div class="avatar">A</div>
-          <div class="profile-text">
-            <span class="role">Pharmacist in charge</span>
-            <span class="name">Dr. Aris</span>
-          </div>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 9L12 15L18 9" stroke="#334" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
+        <UserProfileMenu @logout="emit('logout')" />
       </div>
     </header>
 
@@ -75,6 +66,8 @@
             </svg>
           </button>
         </div>
+
+        <button class="logs-btn" @click="emit('navigate', 'activity-logs')">Recent Activity Logs</button>
 
         <section class="stat-grid">
           <div class="stat-card" v-for="stat in stats" :key="stat.label">
@@ -189,10 +182,14 @@
 
 <script setup>
 import { ref, computed, h } from 'vue'
+import UserProfileMenu from './UserProfileMenu.vue'
+import { ownerStore } from '../store/ownerStore'
 
-const emit = defineEmits(['navigate'])
+const emit = defineEmits(['navigate', 'logout'])
 
 const activeNav = ref('analytics')
+const inventory = computed(() => ownerStore.inventory)
+const orders = computed(() => ownerStore.orders)
 
 function icon(paths) {
   return () =>
@@ -251,12 +248,23 @@ function goTo(id) {
 
 const selectedPeriod = ref('Bulan Ini (Juli 2026)')
 
-const stats = [
-  { label: 'TOTAL REVENUE', value: 'Rp 428.5M', change: '+12.4% vs bulan lalu', trend: 'up' },
-  { label: 'TOTAL TRANSAKSI', value: '1,284', change: '+8.2% vs bulan lalu', trend: 'up' },
-  { label: 'RATA-RATA NILAI PESANAN', value: 'Rp 333.700', change: '-2.1% vs bulan lalu', trend: 'down' },
+const totalInventoryValue = computed(() =>
+  inventory.value.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.stock || 0), 0)
+)
+
+const totalOrdersValue = computed(() =>
+  orders.value.reduce((sum, order) => {
+    const amount = Number(String(order.total).replace(/[^\d]/g, '')) || 0
+    return sum + amount
+  }, 0)
+)
+
+const stats = computed(() => [
+  { label: 'TOTAL REVENUE', value: `Rp ${(totalOrdersValue.value / 1000000).toFixed(1)}M`, change: '+12.4% vs bulan lalu', trend: 'up' },
+  { label: 'TOTAL TRANSAKSI', value: String(orders.value.length), change: '+8.2% vs bulan lalu', trend: 'up' },
+  { label: 'RATA-RATA NILAI PESANAN', value: `Rp ${(totalOrdersValue.value / Math.max(orders.value.length, 1)).toLocaleString('id-ID')}`, change: '-2.1% vs bulan lalu', trend: 'down' },
   { label: 'GROSS MARGIN', value: '34.8%', change: '+1.3% vs bulan lalu', trend: 'up' }
-]
+])
 
 const revenueTrend = [
   { label: 'Feb', value: 310 },
@@ -264,7 +272,7 @@ const revenueTrend = [
   { label: 'Apr', value: 340 },
   { label: 'Mei', value: 380 },
   { label: 'Jun', value: 365 },
-  { label: 'Jul', value: 428 }
+  { label: 'Jul', value: Math.min(428, Math.round(totalInventoryValue.value / 1000000)) }
 ]
 
 const maxRevenue = computed(() => Math.max(...revenueTrend.map((m) => m.value)))

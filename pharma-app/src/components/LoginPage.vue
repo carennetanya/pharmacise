@@ -23,7 +23,7 @@
             v-model="email"
             type="email"
             class="field-input"
-            placeholder=""
+            placeholder="example@gmail.com"
             required
           />
 
@@ -34,7 +34,7 @@
               v-model="password"
               :type="showPassword ? 'text' : 'password'"
               class="field-input"
-              placeholder=""
+              placeholder="........"
               required
             />
             <button
@@ -55,7 +55,11 @@
             </button>
           </div>
 
-          <button type="submit" class="login-btn">Log In</button>
+          <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+
+          <button type="submit" class="login-btn" :disabled="loading">
+            {{ loading ? 'Memproses...' : 'Log In' }}
+          </button>
         </form>
       </div>
     </div>
@@ -66,6 +70,11 @@
 import { ref } from 'vue'
 
 const emit = defineEmits(['login'])
+
+defineProps({
+  errorMessage: { type: String, default: '' },
+  loading: { type: Boolean, default: false }
+})
 
 const email = ref('')
 const password = ref('')
@@ -207,6 +216,15 @@ function handleSubmit() {
   color: rgba(255, 255, 255, 0.6);
 }
 
+.field-input[type='password']::-ms-reveal,
+.field-input[type='password']::-ms-clear {
+  display: none;
+}
+
+.field-input[type='password']::-webkit-textfield-decoration-container {
+  display: none;
+}
+
 .field-input:focus {
   border-color: rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.2);
@@ -257,6 +275,17 @@ function handleSubmit() {
 .login-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.login-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.error-message {
+  margin: -8px 0 16px;
+  color: #ffd6d6;
+  font-size: 12px;
 }
 
 @media (max-width: 768px) {
